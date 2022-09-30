@@ -31,7 +31,7 @@ from sklearn.metrics import mean_absolute_error
 
 
 # !! Definir parametros 
-alfa = 0.98
+alfa = 0.90
 d = 2
 
 
