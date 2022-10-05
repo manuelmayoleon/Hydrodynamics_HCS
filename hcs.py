@@ -31,7 +31,7 @@ from sklearn.metrics import mean_absolute_error
 
 
 # !! Definir parametros 
-alfa = 0.90
+alfa = 0.990
 d = 2
 
 
@@ -148,6 +148,9 @@ plt.plot(X,f.Panel(1).sol21d(X,alfa),color='C1',linestyle = ":" ,label=r'$\lambd
 plt.plot(X, f.Panel(3).sol3(X,alfa),color='C2',label=r'$\lambda_3(d=3)$ ')
 plt.plot(X, f.Panel(d).sol3(X,alfa),color='C2',linestyle = "--",label=r'$\lambda_3(d=2)$ ')
 plt.plot(X, f.Panel(1).sol31d(X,alfa),color='C2',linestyle = ":" ,label=r'$\lambda_3(d=1)$ ')
+
+
+print(f.Panel(1).sol31d(2*np.pi/10.0,alfa))
 
 # plt.plot(X, f.Panel(1).sol_t(X,alfa),color='C3',linestyle = ":",label=r'$\lambda_{||}(d=1)$ ')
 

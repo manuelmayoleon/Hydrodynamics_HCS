@@ -34,17 +34,55 @@ print(path)
 
 # r= pd.read_csv("pos_0.995_tiempo_50000000.txt",header=None,sep='\s+',names=["ry","rz"])
 # r= pd.read_csv("pos_0.995_tiempo_50000000.txt",header=None,sep='\s+',names=["ry","rz"])
-r= pd.read_csv("pos_0.990colpp_100.000.txt",header=None,sep='\s+',names=["ry"])
-v =  pd.read_csv("vel_0.990colpp_100.000.txt" ,header=None,sep='\s+' , names=["vy"])
+r= pd.read_csv("pos_0.995_colpp_800.0.txt",header=None,sep='\s+',names=["ry"])
+v =  pd.read_csv("vel_0.995_colpp_800.0.txt" ,header=None,sep='\s+' , names=["vy"])
 rinicial= pd.read_csv("posiciones_init.txt",header=None,sep='\s+',names=["ry"])
 vinit= pd.read_csv("velocidad_init.txt",header=None,sep='\s+', names=["vy"])
-temp= pd.read_csv("temperaturas_0.990colpp_100.000.txt",header=None,sep='\s+' ,names= ["y"])
-tiempo= pd.read_csv("tiemposdecol_0.990colpp_100.000.txt",header=None,sep='\s+',names=["t"])
+temp= pd.read_csv("temperaturas_0.990colpp_500.0.txt",header=None,sep='\s+' ,names= ["y"])
+tiempo= pd.read_csv("tiemposdecol_0.990colpp_500.0.txt",header=None,sep='\s+',names=["t"])
 
+
+
+info= pd.read_csv("data.txt",header=None,sep='\s+')
+
+
+
+
+
+info.columns = info.iloc[0]
+
+T = info['T']
+L = 10 
+sigma = 10e-5
+
+temp_ini =  info["T"].iloc[-1]
+dens =   float(info["N"].iloc[-1])*sigma / L
+
+
+
+temp_fin = temp["y"].iloc[-1]
+
+beta_ini = 0.5 /float(temp_ini)
+
+beta_fin = 0.5/float(temp_fin)
+
+print(temp_fin)
+# info.drop([0], axis=0, inplace=True)
+# Drop last column of a dataframe
+# info = info.iloc[: , :-1]
+
+
+# colpp = np.array(info[16])
+# a = np.array(info[9])
+# n= np.array(info[1])[-1]
+# epsilon = np.array(info[7])[-1]
+# rho = np.array(info[13])[-1]
 
 
 
 # print(rho)
+
+
 
 
 
@@ -54,18 +92,20 @@ tiempo= pd.read_csv("tiemposdecol_0.990colpp_100.000.txt",header=None,sep='\s+',
 
 #*Esta parte simplemente sirve para poder plotear a la vez
 #* el fit y el histograma
-num_bins =100
+num_bins1 =100
+num_bins =10
+
 fig22,ax = plt.subplots (figsize=(10,10))
 
 plt.xlabel ( r' $v_i$ ', fontsize=20)
 plt.ylabel ( r' Frecuencia ',fontsize=20)
 
-plt.title ( r' \textbf {Histograma de la velocidad en el eje y}  ',fontsize=30)
+plt.title ( r' \textbf {Histograma de la velocidad}  ',fontsize=30)
 # plt.xlim (1 ,9)
 
 #! Hacer el histograma 
-n,bins,patches = ax.hist(v['vy'],num_bins,density ='true',facecolor ='C0',edgecolor='white',label='$v$ ')
-n1,bins1,patches1 = ax.hist(vinit['vy'],num_bins,density ='true',facecolor ='C1',edgecolor='white',alpha=0.5,label='$v_{init}$ ')
+n,bins,patches = ax.hist(v['vy']*np.sqrt(beta_ini),num_bins,density ='true',facecolor ='C0',edgecolor='white',label='$v$ ')
+n1,bins1,patches1 = ax.hist(vinit['vy']*np.sqrt(beta_ini),num_bins1,density ='true',facecolor ='C1',edgecolor='white',alpha=0.5,label='$v_{init}$ ')
 
 # ,edgecolor='yellow'
 plt.grid(color='k', linestyle='--', linewidth=0.5,alpha=0.2)
@@ -74,8 +114,8 @@ N=100
 
 def gaussian(x,mu,sig):
     return np.exp(-np.power(x-mu,2.)/(2*sig))/np.sqrt(2*np.pi*sig)
-x1 =np.linspace(min(v['vy']),max(v['vy']),N)
-x2 =np.linspace(min(vinit['vy']),max(vinit['vy']),N)
+x1 =np.linspace(min(v['vy']*np.sqrt(beta_ini)),np.sqrt(beta_ini)*max(v['vy']),N)
+x2 =np.linspace(min(vinit['vy']*np.sqrt(beta_ini)),max(vinit['vy']*np.sqrt(beta_ini)),N)
 
 #Hacer el fiting de la ley de potencias
 
@@ -88,11 +128,11 @@ params1 , params_covariance1 = optimize.curve_fit(gaussian,bins1[1:],n1,method='
 
 # # print('param')
 # # print (params)
-plt.plot(x1,gaussian(x1,params[0],params[1]),color='C3',label='Ajuste Gaussiano de $v_y$')
+# plt.plot(x1,gaussian(x1,params[0],1),color='C3',label='Ajuste Gaussiano de $v_y$')
 plt.plot(x2,gaussian(x2,params1[0],params1[1]),color='C2',label='Ajuste Gaussiano de $v_{init}$')
 
 plt.legend(loc=0,fontsize=20)
-# plt.xlim(-5,5)    
+plt.xlim(-1.6,1.6)    
 
 # plt.savefig (path+'/histograms/histogram_dist.pdf',format ='pdf')
 

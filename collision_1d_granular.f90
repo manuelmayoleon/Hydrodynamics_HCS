@@ -29,9 +29,10 @@ implicit none
     REAL(kind=8),ALLOCATABLE,DIMENSION(:,:)::sumv ! suma de velocidades para cada colision
     REAL(kind=8),ALLOCATABLE,DIMENSION(:):: tmp !temperaturas en las dos direcciones del espacio
     REAL(kind=8),ALLOCATABLE,DIMENSION(:,:,:):: density !densidad para tiempo t en funcion de k
+    REAL(kind=8),ALLOCATABLE,DIMENSION(:,:):: densityprom !densidad para tiempo t en funcion de k
     REAL(kind=8)::temp,H,longy,sigma,rho !temperaturas en "y" y en "z", altura vertical y anchura, sigma==tamaño de la particula, rho=density
     REAL(kind=8)::alpha  !! coeficiente de restitucion y velocidad que se introduce a traves de la pared 
-    LOGICAL :: granular,pos_para_t
+    LOGICAL :: granular,pos_para_cpp
     REAL(kind=8)::tcol,colt !tiempo de colision, tiempo para comparar y tiempo inicial
     INTEGER::nstep,tray,n,iseed !numero de repeticiones que se realizan (tiempo) y numero de iteraciones  (numero de copias)
     REAL(kind=8)::rab,vab !distancias y velocidades relativas
@@ -41,7 +42,7 @@ implicit none
     REAL(kind=8),ALLOCATABLE,DIMENSION(:)::tiempos !tiempos de colision
     REAL(kind=8), parameter :: pi = 4 * atan (1.0_8)
     ! REAL(kind=8) :: num_onda,ts,gamma,lin_dens, nu,eta,kapa
-    REAL(kind=8) :: num_onda
+    REAL(kind=8) :: num_onda,divisor_para_mod,cpp
     
     !!! para deteminar el tiempo de cálculo
     REAL(kind=4):: start, finish
@@ -60,9 +61,11 @@ implicit none
    
     
     ! alpha=1.00
-    alpha=0.991
-
+    alpha=0.995
     
+    !! Establece el divisior por el cual se determina cuantas veces se guardan posiciones y velocidades
+
+    divisor_para_mod = 1000.0
 
 
    
@@ -82,7 +85,7 @@ implicit none
     ! temp=0.0+num_onda
     temp = 100
     !** 1 colision equivale  a 10^5 pasos temporales
-    nstep=10 !para 1.5*sigma
+    nstep=1500000 !para 1.5*sigma
     
     !! Numero de trayectorias en las que se promedia  
     tray=1
@@ -97,7 +100,7 @@ implicit none
     
     
     ALLOCATE(r(n),v(n),sumv(tray,nstep),tmp(nstep),colisiones(tray),tiempos(nstep))
-    ALLOCATE(density(tray,nstep,2))
+    ALLOCATE(density(tray,nstep,2),densityprom (nstep,2))
 
     
 
@@ -120,35 +123,36 @@ implicit none
      
     write ( *, '(a)' ) ' '
 
- !!! Convertir a caracteres alfa y epsilon !!!!!!!!
+ !!! Convertir a caracteres alfa y colpp !!!!!!!!
     WRITE(alfa,'(F10.3)')   alpha
-    WRITE( colpp,'(F10.3)')   real(nstep)/n
+    WRITE( colpp,'(F10.1)')   real(nstep)/n
     
-
-   
-
   
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !! llamamos al generador de numeros aleatorios
+  
     iseed=2312
+  
     call dran_ini(iseed)
-    !pongo el numero de colisiones a cero
+  
+    !!pongo el numero de colisiones a cero
+  
     colisiones(:)=0.d00
+  
     sumv = 0.d0
 
     !inicializo el tiempo para calcular el tiempo de computo
     call cpu_time(start)
-    !Abro los archivos en los que voy a guardar los valores de las temperaturas, velocidades, posiciones, etc...
-    
+   
+
     !?? If granular eqv true, the particles lost energy on each collision (inelastic disks) 
     !??else, the collision is elastic between particles 
     granular=.TRUE.
     ! granular=.FALSE.
     
  
-    !?? If boolean eqv true, the program saves positions for diferent times steps     
-    ! pos_para_t = .TRUE.
-    pos_para_t = .FALSE.
+    !?? If boolean eqv true, the program saves positions for cols pp      
+    pos_para_cpp = .TRUE.
+    ! pos_para_cpp = .FALSE.
     
 
     !!!! para guardar los valores de las posiciones y velocidades iniciales!!!!!!
@@ -156,7 +160,7 @@ implicit none
     call save_initial_distribution()
    
     density=0
-    ! tiempo_relajacion=0
+  
 
     DO i=1,tray
 
@@ -173,13 +177,12 @@ implicit none
         !! Miro si estan susperpuestas las posiciones 
         ! CALL superpuesto()
         !! Calculo la temp inicial
+        
         print*, "temperatura inicial" 
-        print*, sum(v(:)**2)/n     
-             
-        ! DO k = 1, n
-        !         print*,"velocidad de la particula ",k,"", v(k) 
-        !          print*,"pos de la particula ",k,"", r(k) 
-        ! END DO    
+        
+        print*, sum(v(:)**2)/n    
+
+              
         
       
         DO j=1,nstep
@@ -206,7 +209,7 @@ implicit none
             t=t+colt
             tiempos(j)=t
 
-            print*, colt
+           
 
  
                  !obtenemos las densidades para todo t en el eje horizontal. r(:,1) :eje y. r(:,2) :eje z.  
@@ -218,22 +221,19 @@ implicit none
            
            
             !! avanzo las posiciones hasta el momento de colisión
-                  
-                     
-                            
+
             CALL evolve_positions()
 
+            !! Modifico las velocidades 
 
-            
-            
-
-            !colision entre particulas  
-           
-             
             CALL collide_point_particles(ni(1),ni(2))
+            
+            !! cuento las colisiones totales 
+
             colisiones(i)=colisiones(i)+1
-            print*,"Colisiones p.p"
-            print*,colisiones/n
+            
+            ! print*,"Colisiones p.p"
+            ! print*,colisiones/n
 
             ! print*,'particulas que colisionan', ni(1),ni(2)
             ! print*,'velociades de las particulas que colisionan', v(ni(1)),v(ni(2))
@@ -241,35 +241,24 @@ implicit none
             ! print*,'posiciones de las particulas que colisionan', r(ni(1)),r(ni(2))
             ! CALL superpuesto() 
 
-       
-
-
-            ! print*, "temperatura tras", j , "colisiones" 
-            !     print*, sum(v(:)**2)/n
-            !! OBTENEMOS LOS VALORES DE LAS TEMPERATURA 
-               DO l=1, n 
-                
-                sumv(i,j)=sumv(i,j)+  v(l)**2/n   
-
-
-              
-                        
-               END DO
-
-               Print*,' temp ' , sumv(i,j)
-
-      
-
-               
-
+    
+            !! Calculo las colisiones por particula     
                       
-                
+                cpp  = real(colisiones(i))/real(n)
 
-            
+                !! OBTENEMOS LOS VALORES DE LAS TEMPERATURA 
+                DO l=1, n 
 
-            IF ((j>=nstep-10).AND. (pos_para_t .EQV. .TRUE.) ) THEN 
-              CALL save_med_distribution(alfa,j)
-            END IF 
+                    sumv(i,j)=sumv(i,j)+  v(l)**2/n   
+          
+                END DO
+
+
+            !! si las colpp son divisibles por 100.0, guarda posiciones y velocidades 
+                IF (MOD(cpp,divisor_para_mod)==0.0 .AND. (pos_para_cpp .EQV. .TRUE.) ) THEN 
+                        print*, "col p p ", cpp
+                        CALL save_med_distribution(alfa,cpp)
+                END IF 
              
                
          
@@ -288,17 +277,6 @@ implicit none
         print*, sum(v(:)**2)/n     
        
 
-        ! Guardamos los valores de las velocidades para todas las trayectorias de forma consecutiva. Asi aumentamos la estadística
-
-        ! OPEN(11,FILE='velocidad_' // trim(adjustl(alfa)) // '.txt',  FORM ='FORMATTED',STATUS='UNKNOWN',POSITION='APPEND'&
-        ! ,ACTION='READWRITE')   
-        !         DO l=1,n
-        !             WRITE(11,*) v(l,1), v(l,2)
-        !         END DO
-        !     CLOSE(11)
-       
-
-        !PRINT*, "numero de colisiones en la iteración ",i ,":", colisiones(i)
        
     END DO
     
@@ -313,7 +291,13 @@ implicit none
         END DO
     END DO 
 
-
+    !!! Calculamos la densidad promedio para cada tiempo dado
+    DO l=1,nstep
+        DO m=1,2
+        densityprom(l,m)= sum(density(:,l,m))/tray
+        ! tmp(l,m)=2*tmp(l,m)/(temp+tempz)
+        END DO
+    END DO 
 
 
 
@@ -330,19 +314,19 @@ implicit none
 
 
 
-!! Guardo las posiciones finales 
+! !! Guardo las posiciones finales 
 
-    OPEN(10,FILE='pos_' // trim(adjustl(alfa)) // 'colpp_' // trim(adjustl(colpp)) // '.txt',STATUS='unknown')   
-        DO l=1,n
-         WRITE(10,*) r(l)
-        END DO
-    CLOSE(10) 
-!! Guardo las velocidades finales 
-        OPEN(10,FILE='vel_' // trim(adjustl(alfa)) //  'colpp_' // trim(adjustl(colpp)) // '.txt',STATUS='unknown')   
-        DO l=1,n
-         WRITE(10,*) v(l)
-        END DO
-    CLOSE(10) 
+!     OPEN(10,FILE='pos_' // trim(adjustl(alfa)) // 'colpp_' // trim(adjustl(colpp)) // '.txt',STATUS='unknown')   
+!         DO l=1,n
+!          WRITE(10,*) r(l)
+!         END DO
+!     CLOSE(10) 
+! !! Guardo las velocidades finales 
+!         OPEN(10,FILE='vel_' // trim(adjustl(alfa)) //  'colpp_' // trim(adjustl(colpp)) // '.txt',STATUS='unknown')   
+!         DO l=1,n
+!          WRITE(10,*) v(l)
+!         END DO
+!     CLOSE(10) 
 
 
 
@@ -354,7 +338,12 @@ implicit none
     END DO
     CLOSE(12) 
     
-
+!! Guardo la densidad en el eje y 
+    OPEN(66,FILE='densityprom_' // trim(adjustl(alfa)) // '.txt',STATUS='unknown')
+    DO l=1,nstep
+        WRITE(66,*)   densityprom(l,1), densityprom(l,2) 
+    END DO
+    CLOSE(66)
 
 
 
@@ -401,13 +390,13 @@ implicit none
         subroutine save_med_distribution(aa,bb)
             
             character(len=10)::cc,aa
-            INTEGER :: bb,ii
-            ! REAL(kind=8) :: aa 
-            WRITE(cc,'(I10)') bb 
+            integer :: ii
+            REAL(kind=8) :: bb 
+            WRITE(cc,'(F10.1)') bb 
             ! WRITE(dd,'(F8.3)') aa 
 
-            OPEN(98,FILE='pos_' // trim(adjustl(aa)) // '_tiempo_'// trim(adjustl(cc)) // '.txt',STATUS='unknown')                       
-            OPEN(99,FILE='vel_' // trim(adjustl(aa)) // '_tiempo_' // trim(adjustl(cc)) // '.txt',STATUS='unknown')                      
+            OPEN(98,FILE='pos_' // trim(adjustl(aa)) // '_colpp_'// trim(adjustl(cc)) // '.txt',STATUS='unknown')                       
+            OPEN(99,FILE='vel_' // trim(adjustl(aa)) // '_colpp_' // trim(adjustl(cc)) // '.txt',STATUS='unknown')                      
                                  
             DO ii=1,n                                                                
                 WRITE(98,*) r(ii)
@@ -421,10 +410,8 @@ implicit none
         subroutine save_data_file()
             implicit none 
             LOGICAL :: file_exists
-            INQUIRE(FILE="data.txt", EXIST=file_exists)   ! file_exists will be TRUE if the file
-            
-
-                                               ! exists and FALSE otherwise
+            INQUIRE(FILE="data.txt", EXIST=file_exists)   !! file_exists will be TRUE if the file
+                                                          !! exists and FALSE otherwise
             OPEN(UNIT=35,FILE='data.txt', FORM ='FORMATTED',STATUS='UNKNOWN',POSITION='APPEND'&
             ,ACTION='READWRITE')
             IF (file_exists.EQV. .FALSE.) THEN
@@ -489,11 +476,11 @@ implicit none
 
                                 ! IF (bij<0.0d00 ) THEN !Same as sign(1.0,bij)<0
                                 IF (sign(1.0d00,bij)<0) THEN 
-                                    ! PRINT*, sign(1.0d00,bij)
-                                        ! PRINT*, bij
+                                   
                                     discr=bij**2-(rab**2-sigma**2)*vab**2
+                                   
                                     IF( discr>0.0) THEN ! si colisiona con la sucesiva particula
-                                        ! tcol = ( -bij - SQRT ( discr ) ) / ( SUM ( vab**2 ) )
+                                        
                                         !! ALTERNATIVE WAY 
                                         
                                         ! qij=-(bij+sign(1.0d00,bij)*dsqrt(discr))    
